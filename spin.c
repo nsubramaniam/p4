@@ -31,13 +31,13 @@ void init(spinlock_t *lock)
 	lock->value=0;
 }
 
-void spin_lock(spinlock_t *lock)
+void spinlock_acquire(spinlock_t *lock)
 {
 	while(xchg(&(lock->value),1));
 }
 
 
-void spin_unlock(spinlock_t *lock)
+void spinlock_release(spinlock_t *lock)
 {
 	xchg(&(lock->value),0);
 }
@@ -49,9 +49,9 @@ void *increment(void *n)
 	printf("Count = %d\n",lock->count);
 	for(i=0;i<lock->count;i++)
 	{	
-		spin_lock(lock);
+		spinlock_acquire(lock);
 		balance++;
-		spin_unlock(lock);
+		spinlock_release(lock);
 	}
 	return NULL;
 }
@@ -80,5 +80,6 @@ int main(int argc, char *argv[])
 
 	printf("Balance = %d\n",balance);
 
+	free(lock);
 	return 0;
 }
