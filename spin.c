@@ -1,9 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include "spin.h"
 
 volatile int balance=0;
-volatile unsigned int lock=0;
+
+typedef struct __spinlock
+{
+	short key;
+	int count;	
+	volatile unsigned int value;
+} spinlock_t;
 
 static inline uint xchg(volatile unsigned int *addr, unsigned int newval)
 {
@@ -19,32 +26,32 @@ static inline uint xchg(volatile unsigned int *addr, unsigned int newval)
     	return result;
 }
 
-void init()
+void init(spinlock_t *lock)
 {
-	lock=0;
+	lock->value=0;
 }
 
-void spin_lock()
+void spin_lock(spinlock_t *lock)
 {
-	while(xchg(&lock,1));
+	while(xchg(&(lock->value),1));
 }
 
 
-void spin_unlock()
+void spin_unlock(spinlock_t *lock)
 {
-	xchg(&lock,0);
+	xchg(&(lock->value),0);
 }
-
 
 void *increment(void *n)
 {
-	int i,count=(int)n;
-	printf("Count = %d\n",count);
-	for(i=0;i<count;i++)
+	int i;
+	spinlock_t *lock=(spinlock_t *)n;
+	printf("Count = %d\n",lock->count);
+	for(i=0;i<lock->count;i++)
 	{	
-		spin_lock();
+		spin_lock(lock);
 		balance++;
-		spin_unlock();
+		spin_unlock(lock);
 	}
 	return NULL;
 }
@@ -52,18 +59,21 @@ void *increment(void *n)
 int main(int argc, char *argv[])
 {
 	pthread_t thread1,thread2;
+	spinlock_t *lock=malloc(sizeof(spinlock_t));
+	init(lock);
+
 	if(argc<2)
 	{
 		printf("Error; Usage: ./spin.o <count>\n");
 		return -1;
 	}
 
-	int n=atoi(argv[1]);
+	lock->count=atoi(argv[1]);
 
 	printf("Balance = %d\n",balance);
 	
-	pthread_create(&thread1,NULL,increment,(void *)n);
-	pthread_create(&thread2,NULL,increment,(void *)n);
+	pthread_create(&thread1,NULL,increment,(void *)lock);
+	pthread_create(&thread2,NULL,increment,(void *)lock);
 	
 	pthread_join(thread1,NULL);
 	pthread_join(thread2,NULL);
