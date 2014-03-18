@@ -39,7 +39,7 @@ void spinlock_acquire(spinlock_t *lock)
 
 void spinlock_release(spinlock_t *lock)
 {
-	xchg(&(lock->value),0);
+	lock->value=0; //Don't need to use xchg here
 }
 
 void *increment(void *n)
