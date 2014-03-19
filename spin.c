@@ -1,16 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include "spin.h"
+//#include "counter.h"
 
 volatile int balance=0;
 
-typedef struct __spinlock
+typedef struct __counter
 {
-	short key;
-	int count;	
-	volatile unsigned int value;
-} spinlock_t;
+	volatile unsigned int lock;
+	int value;
+} counter_t;
 
 static inline uint xchg(volatile unsigned int *addr, unsigned int newval)
 {
@@ -26,41 +25,35 @@ static inline uint xchg(volatile unsigned int *addr, unsigned int newval)
     	return result;
 }
 
-void init(spinlock_t *lock)
+void Counter_Init(counter_t *c,int value)
 {
-	lock->value=0;
+	c->value=value;
 }
 
-void spinlock_acquire(spinlock_t *lock)
+int Counter_GetValue(counter_t *c)
 {
-	while(xchg(&(lock->value),1));
+	return c->value;
 }
 
-
-void spinlock_release(spinlock_t *lock)
+void Counter_Increment(counter_t *c)
 {
-	lock->value=0; //Don't need to use xchg here
+	while(xchg(&(c->lock),1));
+	c->value+=1; //Don't need to use xchg here
+	c->lock=0;
 }
 
-void *increment(void *n)
+void Counter_Decrement(counter_t *c)
 {
-	int i;
-	spinlock_t *lock=(spinlock_t *)n;
-	printf("Count = %d\n",lock->count);
-	for(i=0;i<lock->count;i++)
-	{	
-		spinlock_acquire(lock);
-		balance++;
-		spinlock_release(lock);
-	}
-	return NULL;
+	while(xchg(&(c->lock),1));
+	c->value+=-1; //Don't need to use xchg here
+	c->lock=0;
 }
 
 int main(int argc, char *argv[])
 {
 	pthread_t thread1,thread2;
-	spinlock_t *lock=malloc(sizeof(spinlock_t));
-	init(lock);
+	counter_t *c=malloc(sizeof(counter_t));
+	Counter_Init(c,100);
 
 	if(argc<2)
 	{
@@ -68,18 +61,18 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	lock->count=atoi(argv[1]);
+	int i,count=atoi(argv[1]);
 
-	printf("Balance = %d\n",balance);
-	
-	pthread_create(&thread1,NULL,increment,(void *)lock);
-	pthread_create(&thread2,NULL,increment,(void *)lock);
-	
-	pthread_join(thread1,NULL);
-	pthread_join(thread2,NULL);
+	for(i=0;i<count;i++)
+	{	
+		pthread_create(&thread1,NULL,Counter_Increment,(void *)c);
+		pthread_create(&thread2,NULL,Counter_Increment,(void *)c);
+		pthread_join(thread1,NULL);
+		pthread_join(thread2,NULL);
+	}
 
-	printf("Balance = %d\n",balance);
+	printf("c->value = %d\n",c->value);
 
-	free(lock);
+	free(c);
 	return 0;
 }
