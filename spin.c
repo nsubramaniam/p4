@@ -5,9 +5,14 @@
 
 volatile int balance=0;
 
+typedef struct __spinlock
+{
+	volatile unsigned int flag;	
+} spinlock_t;
+
 typedef struct __counter
 {
-	volatile unsigned int lock;
+	spinlock_t lock;
 	int value;
 } counter_t;
 
@@ -25,9 +30,25 @@ static inline uint xchg(volatile unsigned int *addr, unsigned int newval)
     	return result;
 }
 
+void* spinlock_acquire(void* lock)
+{
+	spinlock_t* l_lock;
+	l_lock=(spinlock_t *)lock;
+	while(xchg(&(l_lock->flag),1));	
+}
+
+void* spinlock_release(void* lock)
+{
+	spinlock_t* l_lock;
+	l_lock=(spinlock_t *)lock;
+	l_lock->flag=0;
+}
+
 void Counter_Init(counter_t *c,int value)
 {
+	spinlock_acquire(&(c->lock));
 	c->value=value;
+	spinlock_release(&(c->lock));
 }
 
 int Counter_GetValue(counter_t *c)
@@ -37,42 +58,30 @@ int Counter_GetValue(counter_t *c)
 
 void Counter_Increment(counter_t *c)
 {
-	while(xchg(&(c->lock),1));
-	c->value+=1; //Don't need to use xchg here
-	c->lock=0;
+	spinlock_acquire(&(c->lock));
+	c->value+=1;
+	spinlock_release(&(c->lock));
 }
 
 void Counter_Decrement(counter_t *c)
 {
-	while(xchg(&(c->lock),1));
-	c->value+=-1; //Don't need to use xchg here
-	c->lock=0;
+	spinlock_acquire(&(c->lock));
+	c->value-=1;
+	spinlock_release(&(c->lock));
 }
 
 int main(int argc, char *argv[])
 {
-	pthread_t thread1,thread2;
 	counter_t *c=malloc(sizeof(counter_t));
 	Counter_Init(c,100);
 
-	if(argc<2)
-	{
-		printf("Error; Usage: ./spin.o <count>\n");
-		return -1;
-	}
-
+	printf("c->value = %d\n",c->value);
 	int i,count=atoi(argv[1]);
 
 	for(i=0;i<count;i++)
-	{	
-		pthread_create(&thread1,NULL,Counter_Increment,(void *)c);
-		pthread_create(&thread2,NULL,Counter_Increment,(void *)c);
-		pthread_join(thread1,NULL);
-		pthread_join(thread2,NULL);
-	}
+		Counter_Increment(c);
 
 	printf("c->value = %d\n",c->value);
-
 	free(c);
 	return 0;
 }
