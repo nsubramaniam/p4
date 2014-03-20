@@ -1,20 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-//#include "counter.h"
+#include "counter.h"
 
-volatile int balance=0;
-
-typedef struct __spinlock
-{
-	volatile unsigned int flag;	
-} spinlock_t;
-
-typedef struct __counter
-{
-	spinlock_t lock;
-	int value;
-} counter_t;
+#define KEY 5373
 
 static inline uint xchg(volatile unsigned int *addr, unsigned int newval)
 {
@@ -70,6 +59,66 @@ void Counter_Decrement(counter_t *c)
 	spinlock_release(&(c->lock));
 }
 
+void List_Init(list_t *list)
+{
+	list=malloc(sizeof(list_t));
+	list->next=NULL;
+	list->lock->flag=0;
+	list->key=KEY;
+}
+
+void List_Insert(list_t *list,void *element,unsigned int key)
+{
+	list_t *new_element=malloc(sizeof(list_t));
+	spinlock_acquire(&(list->lock));
+	new_element->next=list->next;
+	list->next=new_element;
+	new_element->element=element;
+	new_element->key=key;
+	new_element->lock->flag=0;
+	spinlock_release(&(list->lock));
+}
+
+void List_Delete(list_t *list, unsigned int key)
+{
+	list_t *currentPtr=list,*prevPtr=NULL;
+	while(currentPtr)
+	{
+		if(currentPtr->key==key && prevPtr)
+		{
+			spinlock_acquire(&(list->lock));
+			prevPtr->next=currentPtr->next;
+			free(currentPtr);
+			spinlock_release(&(list->lock));
+			break;
+		}
+		else
+		{	
+			prevPtr=currentPtr;
+			currentPtr=currentPtr->next;
+		}
+	}
+}	
+
+void *List_Lookup(list_t *list,unsigned int key)
+{
+	list_t *currentPtr=list,*prevPtr=NULL;
+	while(currentPtr)
+	{
+		if(currentPtr->key==key && prevPtr)
+		{
+			return currentPtr->element;
+		}
+		else
+		{	
+			prevPtr=currentPtr;
+			currentPtr=currentPtr->next;
+		}
+	}
+
+	return NULL;
+}
+
 void *testProg(void *c)
 {
 	c=(counter_t *)c;
@@ -78,22 +127,7 @@ void *testProg(void *c)
 
 int main(int argc, char *argv[])
 {
-	counter_t *c=malloc(sizeof(counter_t));
-	Counter_Init(c,0);
-
-	printf("c->value = %d\n",c->value);
-	int i,count=atoi(argv[1]);
-	pthread_t t1,t2;
-
-	for(i=0;i<count;i++)
-	{
-		pthread_create(&t1,NULL,testProg,(void *)c);
-		pthread_create(&t2,NULL,testProg,(void *)c);
-		pthread_join(t1,NULL);
-		pthread_join(t2,NULL);
-	}
+	list_t *list;
 	
-	printf("c->value = %d\n",c->value);
-	free(c);
 	return 0;
 }
