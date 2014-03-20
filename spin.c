@@ -32,15 +32,15 @@ static inline uint xchg(volatile unsigned int *addr, unsigned int newval)
 
 void* spinlock_acquire(void* lock)
 {
-	spinlock_t* l_lock;
-	l_lock=(spinlock_t *)lock;
+	spinlock_t *l_lock;
+	l_lock=(spinlock_t*)lock;
 	while(xchg(&(l_lock->flag),1));	
 }
 
 void* spinlock_release(void* lock)
 {
-	spinlock_t* l_lock;
-	l_lock=(spinlock_t *)lock;
+	spinlock_t *l_lock;
+	l_lock=(spinlock_t*)lock;
 	l_lock->flag=0;
 }
 
@@ -70,17 +70,29 @@ void Counter_Decrement(counter_t *c)
 	spinlock_release(&(c->lock));
 }
 
+void *testProg(void *c)
+{
+	c=(counter_t *)c;
+	Counter_Increment(c);
+}
+
 int main(int argc, char *argv[])
 {
 	counter_t *c=malloc(sizeof(counter_t));
-	Counter_Init(c,100);
+	Counter_Init(c,0);
 
 	printf("c->value = %d\n",c->value);
 	int i,count=atoi(argv[1]);
+	pthread_t t1,t2;
 
 	for(i=0;i<count;i++)
-		Counter_Increment(c);
-
+	{
+		pthread_create(&t1,NULL,testProg,(void *)c);
+		pthread_create(&t2,NULL,testProg,(void *)c);
+		pthread_join(t1,NULL);
+		pthread_join(t2,NULL);
+	}
+	
 	printf("c->value = %d\n",c->value);
 	free(c);
 	return 0;
