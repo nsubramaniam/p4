@@ -4,6 +4,13 @@
 #include "counter.h"
 
 #define KEY 5373
+#define SEED 2654435761
+unsigned int hashtableSize=1;
+
+unsigned int hashfunction(int value)
+{
+	return (value*SEED)%hashtableSize;
+}
 
 static inline uint xchg(volatile unsigned int *addr, unsigned int newval)
 {
@@ -19,6 +26,7 @@ static inline uint xchg(volatile unsigned int *addr, unsigned int newval)
     	return result;
 }
 
+//Spinlock functions
 void* spinlock_acquire(void* lock)
 {
 	spinlock_t *l_lock;
@@ -33,6 +41,7 @@ void* spinlock_release(void* lock)
 	l_lock->flag=0;
 }
 
+//Counter functions
 void Counter_Init(counter_t *c,int value)
 {
 	spinlock_acquire(&(c->lock));
@@ -59,12 +68,14 @@ void Counter_Decrement(counter_t *c)
 	spinlock_release(&(c->lock));
 }
 
+//List functions
 void List_Init(list_t *list)
 {
 	list=malloc(sizeof(list_t));
-	list->next=NULL;
 	list->lock->flag=0;
-	list->key=KEY;
+	list->element=NULL;
+	list->next=NULL;
+	list->key=0;
 }
 
 void List_Insert(list_t *list,void *element,unsigned int key)
@@ -119,6 +130,33 @@ void *List_Lookup(list_t *list,unsigned int key)
 	return NULL;
 }
 
+//Hash Functions
+void Hash_Init(hash_t *hash,int buckets)
+{
+	hashtableSize=buckets;
+	hash=malloc(sizeof(hash_t));
+	hash->lock->flag=0;
+	hash->element=NULL;
+	hash->next=NULL;
+	hash->key=0;
+}
+
+void Hash_Insert(hash_t *hash, void *element, unsigned int key)
+{
+	unsigned int hashValue=hashfunction(key);
+	//Needs code.
+}
+
+void Hash_Delete(hash_t *hash, unsigned int key)
+{
+	//Needs code
+}
+
+void *Hash_Lookup(hash_t *hash, unsigned int key)
+{
+	//Needs code
+}
+
 void *testProg(void *c)
 {
 	c=(counter_t *)c;
@@ -127,7 +165,8 @@ void *testProg(void *c)
 
 int main(int argc, char *argv[])
 {
-	list_t *list;
+	int n=atoi(argv[1]);
+	printf("Hash value = %d\n",hashfunction(n));
 	
 	return 0;
 }
