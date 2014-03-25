@@ -1,5 +1,16 @@
 #include<stdio.h>
 #include<stdlib.h>
+#include "counter.h"
+
+#ifndef __SPINLOCK_H
+#define __SPINLOCK_H
+
+typedef struct __spinlock
+{
+	volatile unsigned int flag;	
+} spinlock_t;
+
+#endif
 
 typedef struct __list
 {

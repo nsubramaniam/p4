@@ -7,11 +7,11 @@
 
 #define KEY 5373
 #define SEED 2654435761
-unsigned int hashtableSize=1;
+unsigned int hashTableSize=1;
 
 unsigned int hashfunction(int value)
 {
-	return (value*SEED)%hashtableSize;
+	return (value*SEED)%hashTableSize;
 }
 
 static inline uint xchg(volatile unsigned int *addr, unsigned int newval)
@@ -75,21 +75,25 @@ void List_Init(list_t *list)
 {
 	list=malloc(sizeof(list_t));
 	list->lock->flag=0;
-	list->element=NULL;
 	list->next=NULL;
-	list->key=0;
 }
 
 void List_Insert(list_t *list,void *element,unsigned int key)
 {
-	//Should change
 	list_t *new_element=malloc(sizeof(list_t));
 	spinlock_acquire(&(list->lock));
-	new_element->next=list->next;
-	list->next=new_element;
-	new_element->element=element;
-	new_element->key=key;
-	new_element->lock->flag=0;
+	if(list->next==NULL)
+	{
+		list->key=key;
+		list->element=element;	
+	}
+	else
+	{
+		new_element->next=list;
+		new_element->element=element;
+		new_element->key=key;
+		new_element->lock->flag=0;
+	}
 	spinlock_release(&(list->lock));
 }
 
@@ -98,17 +102,26 @@ void List_Delete(list_t *list, unsigned int key)
 	list_t *currentPtr=list,*prevPtr=NULL;
 	while(currentPtr)
 	{
-		// Should change
-		if(currentPtr->key==key && prevPtr)
+		//I think this should work - NAS
+		spinlock_acquire(&(list->lock));
+		if(currentPtr->key==key)
 		{
-			spinlock_acquire(&(list->lock));
-			prevPtr->next=currentPtr->next;
-			free(currentPtr);
-			spinlock_release(&(list->lock));
+			if(currentPtr==list)
+			{
+				list=currentPtr->next;
+				free(currentPtr);
+			}
+			else
+			{
+				prevPtr->next=currentPtr->next;
+				free(currentPtr);
+				spinlock_release(&(list->lock));
+			}
 			break;
 		}
 		else
 		{	
+			spinlock_release(&(list->lock));
 			prevPtr=currentPtr;
 			currentPtr=currentPtr->next;
 		}
@@ -136,12 +149,8 @@ void *List_Lookup(list_t *list,unsigned int key)
 //Hash Functions
 void Hash_Init(hash_t *hash,int buckets)
 {
-	hashtableSize=buckets;
-	hash=malloc(sizeof(hash_t));
-	hash->lock->flag=0;
-	hash->element=NULL;
-	hash->next=NULL;
-	hash->key=0;
+	hashTableSize=buckets;
+	hash=malloc(sizeof(hash_t)*buckets); //Need to allocate memory for all buckets?
 }
 
 void Hash_Insert(hash_t *hash, void *element, unsigned int key)
