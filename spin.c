@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include "hash.h"
+#include "list.h"
 #include "counter.h"
 
 #define KEY 5373
@@ -80,6 +82,7 @@ void List_Init(list_t *list)
 
 void List_Insert(list_t *list,void *element,unsigned int key)
 {
+	//Should change
 	list_t *new_element=malloc(sizeof(list_t));
 	spinlock_acquire(&(list->lock));
 	new_element->next=list->next;
@@ -95,6 +98,7 @@ void List_Delete(list_t *list, unsigned int key)
 	list_t *currentPtr=list,*prevPtr=NULL;
 	while(currentPtr)
 	{
+		// Should change
 		if(currentPtr->key==key && prevPtr)
 		{
 			spinlock_acquire(&(list->lock));
@@ -113,23 +117,22 @@ void List_Delete(list_t *list, unsigned int key)
 
 void *List_Lookup(list_t *list,unsigned int key)
 {
-	list_t *currentPtr=list,*prevPtr=NULL;
+	list_t *currentPtr=list;
 	while(currentPtr)
 	{
-		if(currentPtr->key==key && prevPtr)
+		if(currentPtr->key==key)
 		{
 			return currentPtr->element;
 		}
 		else
 		{	
-			prevPtr=currentPtr;
 			currentPtr=currentPtr->next;
 		}
 	}
 
 	return NULL;
 }
-
+// Should change
 //Hash Functions
 void Hash_Init(hash_t *hash,int buckets)
 {
