@@ -73,7 +73,7 @@ void Counter_Decrement(counter_t *c)
 //List functions
 void List_Init(list_t *list)
 {
-	list=malloc(sizeof(list_t));
+	list->lock=malloc(sizeof(spinlock_t));
 	list->lock->flag=0;
 	list->next=NULL;
 }
@@ -86,8 +86,16 @@ void List_Insert(list_t *list,void *element,unsigned int key)
 	new_element->lock=malloc(sizeof(spinlock_t));
 	new_element->lock->flag=0;
 	spinlock_acquire(list->lock);
-	new_element->next=list->next;
-	list->next=new_element;
+	if(list==NULL)
+	{
+		new_element->next=list;
+		list=new_element;
+	}
+	else
+	{
+		new_element->next=list->next;
+		list->next=new_element;
+	}
 	spinlock_release(list->lock);
 }
 
@@ -182,12 +190,8 @@ int main(int argc, char *argv[])
 	int n=atoi(argv[1]);
 	pthread_t t1,t2;
 	list_t *l1;
-	//l1=malloc(sizeof(list_t));
-	//l1->lock=malloc(sizeof(spinlock_t));
-	//l1->lock->flag=0;
-	//l1->next=NULL;
 	List_Init(l1);
-
+	
 	pthread_create(&t1,NULL,testProg,(void *)l1);	
 	pthread_create(&t2,NULL,testProg,(void *)l1);
 
