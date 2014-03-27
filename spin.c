@@ -101,9 +101,9 @@ void List_Delete(list_t *list, unsigned int key)
 		//I think this should work - NAS
 		if(currentPtr->key==key)
 		{
-			spinlock_acquire(list->lock);
+			spinlock_acquire(currentPtr->lock);
 			prevPtr->next=currentPtr->next;
-			spinlock_release(list->lock);
+			spinlock_release(currentPtr->lock);
 			free(currentPtr);
 			break;
 		}
