@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include "hash.h"
+//#include "hash.h"
 #include "list.h"
-#include "counter.h"
+//#include "counter.h"
 
 #define KEY 5373
 #define SEED 2654435761
@@ -81,20 +81,14 @@ void List_Init(list_t *list)
 void List_Insert(list_t *list,void *element,unsigned int key)
 {
 	list_t *new_element=malloc(sizeof(list_t));
-	spinlock_acquire(&(list->lock));
-	if(list->next==NULL)
-	{
-		list->key=key;
-		list->element=element;	
-	}
-	else
-	{
-		new_element->next=list;
-		new_element->element=element;
-		new_element->key=key;
-		new_element->lock->flag=0;
-	}
-	spinlock_release(&(list->lock));
+	new_element->element=element;
+	new_element->key=key;
+	new_element->lock=malloc(sizeof(spinlock_t));
+	new_element->lock->flag=0;
+	spinlock_acquire(list->lock);
+	new_element->next=list->next;
+	list->next=new_element;
+	spinlock_release(list->lock);
 }
 
 void List_Delete(list_t *list, unsigned int key)
@@ -103,7 +97,7 @@ void List_Delete(list_t *list, unsigned int key)
 	while(currentPtr)
 	{
 		//I think this should work - NAS
-		spinlock_acquire(&(list->lock));
+		spinlock_acquire(list->lock);
 		if(currentPtr->key==key)
 		{
 			if(currentPtr==list)
@@ -115,13 +109,13 @@ void List_Delete(list_t *list, unsigned int key)
 			{
 				prevPtr->next=currentPtr->next;
 				free(currentPtr);
-				spinlock_release(&(list->lock));
+				spinlock_release(list->lock);
 			}
 			break;
 		}
 		else
 		{	
-			spinlock_release(&(list->lock));
+			spinlock_release(list->lock);
 			prevPtr=currentPtr;
 			currentPtr=currentPtr->next;
 		}
@@ -145,6 +139,7 @@ void *List_Lookup(list_t *list,unsigned int key)
 
 	return NULL;
 }
+/*
 // Should change
 //Hash Functions
 void Hash_Init(hash_t *hash,int buckets)
@@ -168,17 +163,45 @@ void *Hash_Lookup(hash_t *hash, unsigned int key)
 {
 	//Needs code
 }
-
+*/
 void *testProg(void *c)
 {
-	c=(counter_t *)c;
-	Counter_Increment(c);
+	int i;
+	list_t *list=(list_t *)c;
+	for(i=0;i<100;i++)
+		List_Insert(list,list->element,list->key);
 }
 
 int main(int argc, char *argv[])
 {
+	if(argc<2)
+	{	
+		printf("Enter correct arguments\n");
+		return -1;
+	}
 	int n=atoi(argv[1]);
-	printf("Hash value = %d\n",hashfunction(n));
+	pthread_t t1,t2;
+	list_t *l1;
+	//l1=malloc(sizeof(list_t));
+	//l1->lock=malloc(sizeof(spinlock_t));
+	//l1->lock->flag=0;
+	//l1->next=NULL;
+	List_Init(l1);
+
+	pthread_create(&t1,NULL,testProg,(void *)l1);	
+	pthread_create(&t2,NULL,testProg,(void *)l1);
+
+	pthread_join(t1,NULL);	
+	pthread_join(t2,NULL);	
+
+	int count=0;
+	while(l1)
+	{
+		count++;
+		l1=l1->next;
+	}
+	printf("Number of elements in list : %d\n",count);
+	
 	
 	return 0;
 }
