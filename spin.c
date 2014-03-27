@@ -8,6 +8,7 @@
 #define KEY 5373
 #define SEED 2654435761
 unsigned int hashTableSize=1;
+unsigned short flag=0;
 
 unsigned int hashfunction(int value)
 {
@@ -80,23 +81,27 @@ void List_Init(list_t *list)
 
 void List_Insert(list_t *list,void *element,unsigned int key)
 {
-	list_t *new_element=malloc(sizeof(list_t));
-	new_element->element=element;
-	new_element->key=key;
-	new_element->lock=malloc(sizeof(spinlock_t));
-	new_element->lock->flag=0;
-	spinlock_acquire(list->lock);
-	if(list==NULL)
+printf("%d\n",key);
+	if(flag==0)
 	{
-		new_element->next=list;
-		list=new_element;
+		spinlock_acquire(list->lock);
+		list->element=element;
+		list->key=key;
+		flag=1;
+		spinlock_release(list->lock);
 	}
 	else
 	{
-		new_element->next=list->next;
-		list->next=new_element;
+		list_t *new_element=malloc(sizeof(list_t));
+		new_element->element=element;
+		new_element->key=key;
+		new_element->lock=malloc(sizeof(spinlock_t));
+		(new_element->lock)->flag=0;
+		spinlock_acquire(new_element->lock);
+		new_element->next=list;
+		list=new_element;
+		spinlock_release(list->lock);
 	}
-	spinlock_release(list->lock);
 }
 
 void List_Delete(list_t *list, unsigned int key)
@@ -175,9 +180,8 @@ void *Hash_Lookup(hash_t *hash, unsigned int key)
 void *testProg(void *c)
 {
 	int i;
-	list_t *list=(list_t *)c;
 	for(i=0;i<100;i++)
-		List_Insert(list,list->element,list->key);
+		List_Insert((list_t *)c,"hi",i);
 }
 
 int main(int argc, char *argv[])
@@ -193,15 +197,16 @@ int main(int argc, char *argv[])
 	List_Init(l1);
 	
 	pthread_create(&t1,NULL,testProg,(void *)l1);	
-	pthread_create(&t2,NULL,testProg,(void *)l1);
+	//pthread_create(&t2,NULL,testProg,(void *)l1);
 
 	pthread_join(t1,NULL);	
-	pthread_join(t2,NULL);	
+	//pthread_join(t2,NULL);	
 
 	int count=0;
 	while(l1)
 	{
 		count++;
+		printf("%d\n",l1->key);
 		l1=l1->next;
 	}
 	printf("Number of elements in list : %d\n",count);
