@@ -54,7 +54,11 @@ void Counter_Init(counter_t *c,int value)
 
 int Counter_GetValue(counter_t *c)
 {
-	return c->value;
+	int value;
+	spinlock_acquire(&(c->lock));
+	value = c->value;
+	spinlock_acquire(&(c->lock));
+	return value;
 }
 
 void Counter_Increment(counter_t *c)
@@ -82,15 +86,29 @@ void List_Init(list_t *list)
 
 void List_Insert(list_t *list,void *element,unsigned int key)
 {
-	list_t *new_element=malloc(sizeof(list_t));
+	list_t *new_element=malloc(sizeof(list_t)),*currentPtr=list;
 	new_element->element=element;
 	new_element->key=key;
 	new_element->lock=malloc(sizeof(spinlock_t));
 	new_element->lock->flag=0;
-	spinlock_acquire(list->lock);
-	new_element->next=list->next;
-	list->next=new_element;
-	spinlock_release(list->lock);
+	while(currentPtr)
+	{
+		if(currentPtr->lock->flag==0)
+		{
+			spinlock_acquire(currentPtr->lock);
+			new_element->next=currentPtr->next;
+			currentPtr->next=new_element;
+			spinlock_release(currentPtr->lock);
+			break;
+		}
+		else
+		{
+			if(currentPtr->next!=NULL)
+				currentPtr=currentPtr->next;
+			else
+				currentPtr=list;
+		}
+	}
 }
 
 void List_Delete(list_t *list, unsigned int key)
@@ -98,7 +116,6 @@ void List_Delete(list_t *list, unsigned int key)
 	list_t *currentPtr=list->next,*prevPtr=list;
 	while(currentPtr)
 	{
-		//I think this should work - NAS
 		if(currentPtr->key==key)
 		{
 			spinlock_acquire(currentPtr->lock);
@@ -118,11 +135,15 @@ void List_Delete(list_t *list, unsigned int key)
 void *List_Lookup(list_t *list,unsigned int key)
 {
 	list_t *currentPtr=list->next;
+	void *element=NULL;
 	while(currentPtr)
 	{
 		if(currentPtr->key==key)
 		{
-			return currentPtr->element;
+			spinlock_acquire(currentPtr->lock);
+			element = currentPtr->element;
+			spinlock_release(currentPtr->lock);
+			break;
 		}
 		else
 		{	
@@ -130,7 +151,7 @@ void *List_Lookup(list_t *list,unsigned int key)
 		}
 	}
 
-	return NULL;
+	return element;
 }
 /*
 // Should change
@@ -185,7 +206,7 @@ int main(int argc, char *argv[])
 
 	pthread_join(t1,NULL);	
 	pthread_join(t2,NULL);	
-
+	
 	int count=0;
 	list_t *ptr=l1->next;
 	while(ptr)
