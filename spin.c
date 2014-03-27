@@ -74,68 +74,41 @@ void Counter_Decrement(counter_t *c)
 //List functions
 void List_Init(list_t *list)
 {
+	list->element=NULL;
+	list->next=NULL;
 	list->lock=malloc(sizeof(spinlock_t));
 	list->lock->flag=0;
-	list->next=NULL;
 }
 
 void List_Insert(list_t *list,void *element,unsigned int key)
 {
-printf("%d\n",key);
-printf("List : %04x\n",list);
-	if(flag==0)
-	{
-		spinlock_acquire(list->lock);
-		list->element=element;
-		list->key=key;
-		flag=1;
-		spinlock_release(list->lock);
-printf("List : %04x\n",list);
-	}
-	else
-	{
-		list_t *new_element=malloc(sizeof(list_t));
-		new_element->element=element;
-		new_element->key=key;
-		new_element->lock=malloc(sizeof(spinlock_t));
-		(new_element->lock)->flag=0;
-		spinlock_acquire(new_element->lock);
-printf("New Element : %04x\n",new_element);
-		new_element->next=list;
-		list=new_element;
-		spinlock_release(list->lock);
-printf("List : %04x\n",list);
-printf("List->next : %04x\n",list->next);
-int n;
-scanf("%d",&n);
-	}
+	list_t *new_element=malloc(sizeof(list_t));
+	new_element->element=element;
+	new_element->key=key;
+	new_element->lock=malloc(sizeof(spinlock_t));
+	new_element->lock->flag=0;
+	spinlock_acquire(list->lock);
+	new_element->next=list->next;
+	list->next=new_element;
+	spinlock_release(list->lock);
 }
 
 void List_Delete(list_t *list, unsigned int key)
 {
-	list_t *currentPtr=list,*prevPtr=NULL;
+	list_t *currentPtr=list->next,*prevPtr=list;
 	while(currentPtr)
 	{
 		//I think this should work - NAS
-		spinlock_acquire(list->lock);
 		if(currentPtr->key==key)
 		{
-			if(currentPtr==list)
-			{
-				list=currentPtr->next;
-				free(currentPtr);
-			}
-			else
-			{
-				prevPtr->next=currentPtr->next;
-				free(currentPtr);
-				spinlock_release(list->lock);
-			}
+			spinlock_acquire(list->lock);
+			prevPtr->next=currentPtr->next;
+			spinlock_release(list->lock);
+			free(currentPtr);
 			break;
 		}
 		else
 		{	
-			spinlock_release(list->lock);
 			prevPtr=currentPtr;
 			currentPtr=currentPtr->next;
 		}
@@ -144,7 +117,7 @@ void List_Delete(list_t *list, unsigned int key)
 
 void *List_Lookup(list_t *list,unsigned int key)
 {
-	list_t *currentPtr=list;
+	list_t *currentPtr=list->next;
 	while(currentPtr)
 	{
 		if(currentPtr->key==key)
@@ -188,36 +161,56 @@ void *testProg(void *c)
 {
 	int i;
 	list_t *list=(list_t *)c;
-	for(i=0;i<100;i++)
+	for(i=0;i<103;i++)
 		List_Insert(list,"hi",i);
+}
+
+void *testProg2(void *c)
+{
+	int i;
+	list_t *list=(list_t *)c;
+	for(i=0;i<100;i++)
+		List_Delete(list,i);
 }
 
 int main(int argc, char *argv[])
 {
-	if(argc<2)
-	{	
-		printf("Enter correct arguments\n");
-		return -1;
-	}
-	int n=atoi(argv[1]);
 	pthread_t t1,t2;
 	list_t *l1;
+	l1=malloc(sizeof(list_t));
 	List_Init(l1);
 	
 	pthread_create(&t1,NULL,testProg,l1);	
-	//pthread_create(&t2,NULL,testProg,(void *)l1);
+	pthread_create(&t2,NULL,testProg,l1);
 
 	pthread_join(t1,NULL);	
-	//pthread_join(t2,NULL);	
+	pthread_join(t2,NULL);	
 
 	int count=0;
-	while(l1)
+	list_t *ptr=l1->next;
+	while(ptr)
 	{
 		count++;
-		l1=l1->next;
+		printf("Key : %d, Element=%s\n",ptr->key,(int *)List_Lookup(l1,ptr->key));
+		ptr=ptr->next;
 	}
-	printf("Number of elements in list : %d\n",count);
+	printf("Number of elements in list after insertion : %d\n",count);
 	
+	pthread_t t3,t4;
+	pthread_create(&t3,NULL,testProg2,l1);	
+	pthread_create(&t4,NULL,testProg2,l1);
+
+	pthread_join(t3,NULL);	
+	pthread_join(t4,NULL);	
+	count=0;
+	ptr=l1->next;
+	while(ptr)
+	{
+		count++;
+		printf("Key : %d, Element=%s\n",ptr->key,(int *)List_Lookup(l1,ptr->key));
+		ptr=ptr->next;
+	}
+	printf("Number of elements in list after deletion : %d\n",count);	
 	
 	return 0;
 }
