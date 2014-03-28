@@ -1,11 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-//#include "hash.h"
-#include "list.h"
-//#include "counter.h"
 
-#define KEY 5373
+#include "counter.h"
+#include "hash.h"
+
 #define SEED 2654435761
 unsigned int hashTableSize=1;
 unsigned short flag=0;
@@ -153,85 +152,73 @@ void *List_Lookup(list_t *list,unsigned int key)
 
 	return element;
 }
-/*
-// Should change
+
 //Hash Functions
 void Hash_Init(hash_t *hash,int buckets)
 {
 	hashTableSize=buckets;
-	hash=malloc(sizeof(hash_t)*buckets); //Need to allocate memory for all buckets?
+	int i;
+	hash_t *currentPtr=hash;
+	for(i=0;i<buckets;i++)
+	{
+		currentPtr->list=malloc(sizeof(list_t));
+		List_Init(currentPtr->list);
+		currentPtr+=sizeof(hash_t);
+	}
 }
 
 void Hash_Insert(hash_t *hash, void *element, unsigned int key)
 {
 	unsigned int hashValue=hashfunction(key);
-	//Needs code.
+	hash_t *currentPtr=hash+(sizeof(hash_t)*hashValue);
+	List_Insert(currentPtr->list,element,key);
 }
 
 void Hash_Delete(hash_t *hash, unsigned int key)
 {
-	//Needs code
+	unsigned int hashValue=hashfunction(key);
+	hash_t *currentPtr=hash+(sizeof(hash_t)*hashValue);
+	List_Delete(currentPtr->list,key);
 }
 
 void *Hash_Lookup(hash_t *hash, unsigned int key)
 {
-	//Needs code
+	unsigned int hashValue=hashfunction(key);
+	void *element;
+	hash_t *currentPtr=hash+(sizeof(hash_t)*hashValue);
+	element = List_Lookup(currentPtr->list,key);
+	return element;
 }
-*/
+
+
+//Test Programs
 void *testProg(void *c)
 {
 	int i;
-	list_t *list=(list_t *)c;
-	for(i=0;i<103;i++)
-		List_Insert(list,"hi",i);
+	for(i=0;i<13;i++)
+		Hash_Insert((hash_t *)c,"hi",i);
 }
 
 void *testProg2(void *c)
 {
 	int i;
-	list_t *list=(list_t *)c;
-	for(i=0;i<100;i++)
-		List_Delete(list,i);
+	for(i=0;i<10;i++)
+		Hash_Delete((hash_t *)c,10);
 }
+
 
 int main(int argc, char *argv[])
 {
+	int buckets=10;
+	hash_t *hash=malloc(sizeof(hash_t)*buckets);
+	Hash_Init(hash,buckets);
+
 	pthread_t t1,t2;
-	list_t *l1;
-	l1=malloc(sizeof(list_t));
-	List_Init(l1);
+	pthread_create(&t1,NULL,testProg,hash);
+	pthread_create(&t2,NULL,testProg,hash);
 	
-	pthread_create(&t1,NULL,testProg,l1);	
-	pthread_create(&t2,NULL,testProg,l1);
+	pthread_join(t1,NULL);
+	pthread_join(t2,NULL);
 
-	pthread_join(t1,NULL);	
-	pthread_join(t2,NULL);	
-	
-	int count=0;
-	list_t *ptr=l1->next;
-	while(ptr)
-	{
-		count++;
-		printf("Key : %d, Element=%s\n",ptr->key,(int *)List_Lookup(l1,ptr->key));
-		ptr=ptr->next;
-	}
-	printf("Number of elements in list after insertion : %d\n",count);
-	
-	pthread_t t3,t4;
-	pthread_create(&t3,NULL,testProg2,l1);	
-	pthread_create(&t4,NULL,testProg2,l1);
-
-	pthread_join(t3,NULL);	
-	pthread_join(t4,NULL);	
-	count=0;
-	ptr=l1->next;
-	while(ptr)
-	{
-		count++;
-		printf("Key : %d, Element=%s\n",ptr->key,(int *)List_Lookup(l1,ptr->key));
-		ptr=ptr->next;
-	}
-	printf("Number of elements in list after deletion : %d\n",count);	
-	
 	return 0;
 }

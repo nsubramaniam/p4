@@ -1,16 +1,6 @@
-#include<stdio.h>
-#include<stdlib.h>
-#include "counter.h"
-
-#ifndef __SPINLOCK_H
-#define __SPINLOCK_H
-
-typedef struct __spinlock
-{
-	volatile unsigned int flag;	
-} spinlock_t;
-
-#endif
+#ifndef LIST_H
+#define LIST_H
+#include "spin.h"
 
 typedef struct __list
 {
@@ -25,3 +15,4 @@ void List_Insert(list_t *list,void *element,unsigned int key);
 void List_Delete(list_t *list, unsigned int key);
 void *List_Lookup(list_t *list,unsigned int key);
 
+#endif
