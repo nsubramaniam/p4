@@ -157,12 +157,16 @@ void *List_Lookup(list_t *list,unsigned int key)
 void Hash_Init(hash_t *hash,int buckets)
 {
 	hashTableSize=buckets;
-	int i;
 	hash_t *currentPtr=hash;
+	int i;
 	for(i=0;i<buckets;i++)
 	{
 		currentPtr->list=malloc(sizeof(list_t));
-		List_Init(currentPtr->list);
+		currentPtr->list->next=NULL;
+		currentPtr->list->element=NULL;
+		currentPtr->list->key=0;
+		currentPtr->list->lock=malloc(sizeof(spinlock_t));
+		currentPtr->list->lock->flag=0;
 		currentPtr+=sizeof(hash_t);
 	}
 }
@@ -212,13 +216,20 @@ int main(int argc, char *argv[])
 	int buckets=10;
 	hash_t *hash=malloc(sizeof(hash_t)*buckets);
 	Hash_Init(hash,buckets);
-
+	hash_t *currentPtr=hash;
+	int i;
+	for(i=0;i<buckets;i++)
+	{
+		printf("Lock = %d\n",currentPtr->list->lock->flag);	
+		currentPtr+=sizeof(hash_t);
+	}
+/*
 	pthread_t t1,t2;
 	pthread_create(&t1,NULL,testProg,hash);
 	pthread_create(&t2,NULL,testProg,hash);
 	
 	pthread_join(t1,NULL);
 	pthread_join(t2,NULL);
-
+*/
 	return 0;
 }
