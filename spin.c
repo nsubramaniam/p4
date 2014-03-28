@@ -112,14 +112,14 @@ void List_Insert(list_t *list,void *element,unsigned int key)
 
 void List_Delete(list_t *list, unsigned int key)
 {
-	list_t *currentPtr=list->next,*prevPtr=list;
+	list_t *prevPtr=list;
+	spinlock_acquire(list->lock);
+	list_t *currentPtr=list->next;
 	while(currentPtr)
 	{
 		if(currentPtr->key==key)
 		{
-			spinlock_acquire(currentPtr->lock);
 			prevPtr->next=currentPtr->next;
-			spinlock_release(currentPtr->lock);
 			free(currentPtr);
 			break;
 		}
@@ -129,6 +129,7 @@ void List_Delete(list_t *list, unsigned int key)
 			currentPtr=currentPtr->next;
 		}
 	}
+	spinlock_release(list->lock);
 }	
 
 void *List_Lookup(list_t *list,unsigned int key)
@@ -157,31 +158,27 @@ void *List_Lookup(list_t *list,unsigned int key)
 void Hash_Init(hash_t *hash,int buckets)
 {
 	hashTableSize=buckets;
-	hash_t *currentPtr=hash;
+	hash_t *currentPtr;
 	int i;
 	for(i=0;i<buckets;i++)
 	{
+		currentPtr=(void *)hash+(i*sizeof(hash_t));
 		currentPtr->list=malloc(sizeof(list_t));
-		currentPtr->list->next=NULL;
-		currentPtr->list->element=NULL;
-		currentPtr->list->key=0;
-		currentPtr->list->lock=malloc(sizeof(spinlock_t));
-		currentPtr->list->lock->flag=0;
-		currentPtr+=sizeof(hash_t);
+		List_Init(currentPtr->list);
 	}
 }
 
 void Hash_Insert(hash_t *hash, void *element, unsigned int key)
 {
 	unsigned int hashValue=hashfunction(key);
-	hash_t *currentPtr=hash+(sizeof(hash_t)*hashValue);
+	hash_t *currentPtr=(void *)hash+(sizeof(hash_t)*hashValue);
 	List_Insert(currentPtr->list,element,key);
 }
 
 void Hash_Delete(hash_t *hash, unsigned int key)
 {
 	unsigned int hashValue=hashfunction(key);
-	hash_t *currentPtr=hash+(sizeof(hash_t)*hashValue);
+	hash_t *currentPtr=(void *)hash+(sizeof(hash_t)*hashValue);
 	List_Delete(currentPtr->list,key);
 }
 
@@ -194,42 +191,68 @@ void *Hash_Lookup(hash_t *hash, unsigned int key)
 	return element;
 }
 
-
 //Test Programs
 void *testProg(void *c)
 {
 	int i;
-	for(i=0;i<13;i++)
+	for(i=0;i<10003;i++)
 		Hash_Insert((hash_t *)c,"hi",i);
 }
 
 void *testProg2(void *c)
 {
 	int i;
-	for(i=0;i<10;i++)
-		Hash_Delete((hash_t *)c,10);
+	for(i=0;i<10000;i++)
+		Hash_Delete((hash_t *)c,i);
 }
 
+void printList(list_t *list)
+{
+	while(list)
+	{
+		printf("Key = %d\n",list->key);
+		list=list->next;
+	}
+	
+}
 
 int main(int argc, char *argv[])
 {
 	int buckets=10;
-	hash_t *hash=malloc(sizeof(hash_t)*buckets);
+	hash_t *hash=(hash_t *)malloc(sizeof(hash_t)*buckets);
 	Hash_Init(hash,buckets);
-	hash_t *currentPtr=hash;
-	int i;
-	for(i=0;i<buckets;i++)
-	{
-		printf("Lock = %d\n",currentPtr->list->lock->flag);	
-		currentPtr+=sizeof(hash_t);
-	}
-/*
+	hash_t *currentPtr;
+
 	pthread_t t1,t2;
 	pthread_create(&t1,NULL,testProg,hash);
 	pthread_create(&t2,NULL,testProg,hash);
 	
 	pthread_join(t1,NULL);
 	pthread_join(t2,NULL);
-*/
+	
+	printf("After insertion\n");
+	int i;
+	for(i=0;i<buckets;i++)
+	{
+		currentPtr=(void *)hash+i*sizeof(hash_t);
+		if(currentPtr->list->next!=NULL)
+			printList(currentPtr->list->next);
+	}
+
+	pthread_t t3,t4;
+	pthread_create(&t3,NULL,testProg2,hash);
+	pthread_create(&t4,NULL,testProg2,hash);
+	
+	pthread_join(t3,NULL);
+	pthread_join(t4,NULL);
+
+	printf("After deletion\n");
+	for(i=0;i<buckets;i++)
+	{
+		currentPtr=(void *)hash+i*sizeof(hash_t);
+		if(currentPtr->list->next!=NULL)
+			printList(currentPtr->list->next);
+	}
+
 	return 0;
 }
