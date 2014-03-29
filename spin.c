@@ -190,7 +190,7 @@ void *Hash_Lookup(hash_t *hash, unsigned int key)
 	element = List_Lookup(currentPtr->list,key);
 	return element;
 }
-
+/*
 //Test Programs
 void *testProg(void *c)
 {
@@ -255,4 +255,4 @@ int main(int argc, char *argv[])
 	}
 
 	return 0;
-}
+}*/
