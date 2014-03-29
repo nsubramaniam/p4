@@ -19,24 +19,10 @@ void List_Insert(list_t *list,void *element,unsigned int key)
 	new_element->key=key;
 	new_element->lock=malloc(sizeof(spinlock_t));
 	new_element->lock->flag=0;
-	while(currentPtr)
-	{
-		if(currentPtr->lock->flag==0)
-		{
-			spinlock_acquire(currentPtr->lock);
-			new_element->next=currentPtr->next;
-			currentPtr->next=new_element;
-			spinlock_release(currentPtr->lock);
-			break;
-		}
-		else
-		{
-			if(currentPtr->next!=NULL)
-				currentPtr=currentPtr->next;
-			else
-				currentPtr=list;
-		}
-	}
+	spinlock_acquire(list->lock);
+	new_element->next=currentPtr->next;
+	currentPtr->next=new_element;
+	spinlock_release(list->lock);
 }
 
 void List_Delete(list_t *list, unsigned int key)
@@ -65,13 +51,12 @@ void *List_Lookup(list_t *list,unsigned int key)
 {
 	list_t *currentPtr=list->next;
 	void *element=NULL;
+	spinlock_acquire(list->lock);
 	while(currentPtr)
 	{
 		if(currentPtr->key==key)
 		{
-			spinlock_acquire(currentPtr->lock);
 			element = currentPtr->element;
-			spinlock_release(currentPtr->lock);
 			break;
 		}
 		else
@@ -79,6 +64,7 @@ void *List_Lookup(list_t *list,unsigned int key)
 			currentPtr=currentPtr->next;
 		}
 	}
+	spinlock_release(list->lock);
 
 	return element;
 }
