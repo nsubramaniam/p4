@@ -21,7 +21,7 @@ void* spinlock_acquire(void* lock)
 {
 	spinlock_t *l_lock;
 	l_lock=(spinlock_t*)lock;
-	while(xchg(&(l_lock->flag),1));	
+	while(xchg(&(l_lock->flag),1));
 }
 
 void* spinlock_release(void* lock)
